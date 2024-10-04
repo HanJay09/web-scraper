@@ -24,10 +24,12 @@ export function Header() {
           <Link className="text-sm font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400 transition-colors" href="/contact">
             Contact
           </Link>
+          <Link href="/login">
           <Button variant="outline" size="sm" className="hidden sm:inline-flex">
             <LogIn className="mr-2 h-4 w-4" />
             Log In
           </Button>
+          </Link>
           <Button size="sm" className="hidden sm:inline-flex">
             <UserPlus className="mr-2 h-4 w-4" />
             Sign Up
