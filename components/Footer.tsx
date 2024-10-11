@@ -12,7 +12,7 @@ export function Footer() {
         <span className="text-sm font-medium text-gray-900 dark:text-white">ScraperPro</span>
       </div>
       <p className="text-sm text-gray-500 dark:text-gray-400 mt-4 sm:mt-0">
-        © 2023 ScraperPro. All rights reserved.
+        © 2024 ScraperPro. All rights reserved.
       </p>
       <nav className="flex gap-4 sm:gap-6 mt-4 sm:mt-0">
         <Link className="text-sm text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 transition-colors" href="/terms">

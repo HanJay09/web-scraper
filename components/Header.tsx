@@ -30,10 +30,12 @@ export function Header() {
             Log In
           </Button>
           </Link>
+          <Link href="/signup">
           <Button size="sm" className="hidden sm:inline-flex">
             <UserPlus className="mr-2 h-4 w-4" />
             Sign Up
           </Button>
+          </Link>
         </nav>
       </header>
   )
