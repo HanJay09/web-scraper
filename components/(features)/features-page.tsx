@@ -1,6 +1,5 @@
 'use client'
 
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Globe, Cpu, BarChart, Lock, Code, Bell, Gauge, RefreshCcw, Layers } from "lucide-react"
@@ -229,9 +228,6 @@ export default function FeaturesPageComponent() {
               <p className="mx-auto max-w-[700px] text-indigo-100 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
                 Start extracting valuable insights from e-commerce data today.
               </p>
-              <Button className="bg-white text-indigo-600 hover:bg-indigo-100">
-                Start Your Free Trial
-              </Button>
             </div>
           </div>
         </section>

@@ -1,9 +1,9 @@
 'use client'
 
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { ArrowRight, CheckCircle, LineChart, ShieldCheck } from "lucide-react"
+import Link from 'next/link'
 
 
 export function HomePageComponent() {
@@ -75,9 +75,6 @@ export function HomePageComponent() {
                   Join industry leaders who trust ScraperPro for their mission-critical data needs.
                 </p>
               </div>
-              <Button className="bg-white text-indigo-600 hover:bg-indigo-100">
-                Start Your Free Trial
-              </Button>
             </div>
           </div>
         </section>
@@ -90,16 +87,13 @@ export function HomePageComponent() {
               <p className="text-gray-700 dark:text-gray-300 max-w-[600px]">
                 Have questions or need more information? Get in touch with our team.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
-                <Input
-                  className="flex-1"
-                  placeholder="Enter your email"
-                  type="email"
-                />
+              <div className="flex justify-center w-full">
+                <Link href="/contact"> 
                 <Button className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                  Send
+                  Contact Us
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
+                </Link>
               </div>
             </div>
           </div>

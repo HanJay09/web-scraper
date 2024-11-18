@@ -1,6 +1,6 @@
 'use client'
 
-import { Button } from "@/components/ui/button"
+{/*import { Button } from "@/components/ui/button"*/}
 import { Card, CardContent } from "@/components/ui/card"
 import { Users, Target, Lightbulb, TrendingUp, Shield } from "lucide-react"
 import Image from "next/image"
@@ -115,9 +115,6 @@ export function AboutUsPageComponent() {
               <p className="mx-auto max-w-[700px] text-indigo-100 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
                 Experience the power of ScraperPro and unlock the potential of your business.
               </p>
-              <Button className="bg-white text-indigo-600 hover:bg-indigo-100">
-                Start Your Free Trial
-              </Button>
             </div>
           </div>
         </section>

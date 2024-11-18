@@ -30,10 +30,6 @@ const faqs: FAQItem[] = [
   {
     question: "What kind of support does ScraperPro offer?",
     answer: "We offer comprehensive support including detailed documentation, video tutorials, and a knowledge base. Our premium plans include priority email support, and our enterprise plan offers dedicated account management and custom solution development."
-  },
-  {
-    question: "How does pricing work for ScraperPro?",
-    answer: "ScraperPro offers tiered pricing plans based on the volume of data you need to scrape and the features you require. We have plans suitable for individual developers, small businesses, and large enterprises. For detailed pricing information, please visit our pricing page or contact our sales team."
   }
 ]
 
