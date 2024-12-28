@@ -8,16 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from "@/lib/supabaseClient"; // Adjusted import if you store supabase client in a separate file
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-// src/lib/supabaseClient.js
-
-const supabaseUrl = 'https://otdhyixbxugmikkfbbkr.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im90ZGh5aXhieHVnbWlra2ZiYmtyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjg2MDk0OTgsImV4cCI6MjA0NDE4NTQ5OH0.y6qAW2wx2dMA6CJNxVlo9YirWBze6zCyJXuchjd3fD8'; 
-
-export const supabase = createClient(supabaseUrl, supabaseKey);
-
 
 export function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -30,38 +23,69 @@ export function SignupPage() {
   const togglePasswordVisibility = () => setShowPassword(!showPassword);
   const toggleConfirmPasswordVisibility = () => setShowConfirmPassword(!showConfirmPassword);
 
-  const handleSignup = async (e: React.FormEvent) => {
+  const handleSignup = async (e: { preventDefault: () => void; }) => {
     e.preventDefault();
-
+  
     if (password !== confirmPassword) {
       toast.error("Passwords do not match!");
       return;
     }
-
+  
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { data, error } = await supabase.from("users").insert([
-        {
-          full_name: name,
-          email,
-          password, // For production, hash passwords before storing them
-        },
-      ]);
-
+      // Sign up user with email and password
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+  
       if (error) {
         toast.error(error.message);
       } else {
-        toast.success("Account created successfully!");
+        toast.success("Account created successfully! Please verify your email.");
         setName("");
         setEmail("");
         setPassword("");
         setConfirmPassword("");
+  
+        // Set full name as display name after email verification
+        const checkEmailVerified = setInterval(async () => {
+          const { data: userData, error: getUserError } = await supabase.auth.getUser();
+  
+          if (getUserError) {
+            toast.error(getUserError.message);
+            clearInterval(checkEmailVerified); // Stop checking in case of error
+            return;
+          }
+  
+          const user = userData?.user;
+  
+          if (user?.email_confirmed_at) {
+            // Update display name after email is verified
+            const { error: updateError } = await supabase.auth.updateUser({
+              data: { full_name: name }, // This sets the full name as the display name
+            });
+  
+            if (updateError) {
+              toast.error("Failed to update display name.");
+            } else {
+              toast.success("Display name updated!");
+            }
+            clearInterval(checkEmailVerified); // Stop checking after updating
+          }
+        }, 5000); // Check every 5 seconds for email verification
+  
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 1500); // Wait 1.5 seconds before redirecting
       }
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) {
       toast.error("An unexpected error occurred. Please try again.");
     }
   };
+  
+  
+  
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-indigo-50 via-white to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
@@ -76,7 +100,7 @@ export function SignupPage() {
           <CardContent className="space-y-4">
             <form onSubmit={handleSignup} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
+                <Label htmlFor="name">Name</Label>
                 <Input
                   id="name"
                   placeholder="John Doe"
