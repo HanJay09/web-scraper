@@ -1,42 +1,89 @@
-'use client'
+'use client';
 
-import { Button } from "@/components/ui/button"
-import {  Zap, LogIn, UserPlus } from "lucide-react"
-import Link from "next/link"
+import { Button } from "@/components/ui/button";
+import { Zap, LogOut, User } from "lucide-react";
+import Link from "next/link";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabaseClient"; // Adjust import path based on your project structure
+import { User as SupabaseUser } from "@supabase/supabase-js"; // Import User type from Supabase library
 
 export function Header() {
+  const [user, setUser] = useState<SupabaseUser | null>(null); // Correctly typed state
+
+  // Fetch the logged-in user
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        setUser(data.user); // This works because of the correct typing
+      }
+    };
+    fetchUser();
+  }, []);
+
+  // Handle logout
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (!error) {
+      setUser(null); // Reset user state
+      window.location.href = "/"; // Redirect to home after logout
+    }
+  };
+
   return (
-<header className="px-4 lg:px-6 h-16 flex items-center fixed w-full backdrop-blur-md bg-white/30 dark:bg-gray-900/30 border-b border-gray-200 dark:border-gray-800 z-50">
-        <Link className="flex items-center justify-center" href="/">
-          <Zap className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-          <span className="ml-2 text-xl font-bold text-gray-900 dark:text-white">ScraperPro</span>
+    <header className="px-4 lg:px-6 h-16 flex items-center fixed w-full backdrop-blur-md bg-white/30 dark:bg-gray-900/30 border-b border-gray-200 dark:border-gray-800 z-50">
+      <Link className="flex items-center justify-center" href="/">
+        <Zap className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+        <span className="ml-2 text-xl font-bold text-gray-900 dark:text-white">ScraperPro</span>
+      </Link>
+      <nav className="ml-auto flex items-center gap-4 sm:gap-6">
+        <Link
+          className="text-sm font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400 transition-colors"
+          href="/features"
+        >
+          Features
         </Link>
-        <nav className="ml-auto flex items-center gap-4 sm:gap-6">
-          <Link className="text-sm font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400 transition-colors" href="/features">
-            Features
-          </Link>
-          <Link className="text-sm font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400 transition-colors" href="/about">
-            About Us
-          </Link>
-          <Link className="text-sm font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400 transition-colors" href="/faq">
-            FaQ
-          </Link>
-          <Link className="text-sm font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400 transition-colors" href="/contact">
-            Contact
-          </Link>
-          <Link href="/login">
-          <Button variant="outline" size="sm" className="hidden sm:inline-flex">
-            <LogIn className="mr-2 h-4 w-4" />
-            Log In
-          </Button>
-          </Link>
-          <Link href="/signup">
-          <Button size="sm" className="hidden sm:inline-flex">
-            <UserPlus className="mr-2 h-4 w-4" />
-            Sign Up
-          </Button>
-          </Link>
-        </nav>
-      </header>
-  )
+        <Link
+          className="text-sm font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400 transition-colors"
+          href="/about"
+        >
+          About Us
+        </Link>
+        <Link
+          className="text-sm font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400 transition-colors"
+          href="/faq"
+        >
+          FAQ
+        </Link>
+        <Link
+          className="text-sm font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400 transition-colors"
+          href="/contact"
+        >
+          Contact
+        </Link>
+
+        {user ? (
+          <>
+            <Link
+              className="hidden sm:inline-flex text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors"
+              href="/profile"
+            >
+              <Button variant="outline" size="sm" className="flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Profile
+              </Button>
+            </Link>
+            <Button size="sm" className="hidden sm:inline-flex" onClick={handleLogout}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Log Out
+            </Button>
+          </>
+        ) : (
+          <>
+
+          </>
+        )}
+      </nav>
+    </header>
+  );
 }
