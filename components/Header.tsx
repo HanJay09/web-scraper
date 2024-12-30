@@ -19,7 +19,7 @@ export function Header() {
             About Us
           </Link>
           <Link className="text-sm font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400 transition-colors" href="/faq">
-            FaQ
+            FAQ
           </Link>
           <Link className="text-sm font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400 transition-colors" href="/contact">
             Contact

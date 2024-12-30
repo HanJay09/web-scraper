@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient"; // Adjust import path based on your project structure
 import { User as SupabaseUser } from "@supabase/supabase-js"; // Import User type from Supabase library
 
-export function Header() {
+export function Header2() {
   const [user, setUser] = useState<SupabaseUser | null>(null); // Correctly typed state
 
   // Fetch the logged-in user
