@@ -12,12 +12,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-// backend/server.ts
 const express_1 = __importDefault(require("express"));
+const cors_1 = __importDefault(require("cors")); // Import cors
 const node_fetch_1 = __importDefault(require("node-fetch"));
 const buffer_1 = require("buffer");
 const app = (0, express_1.default)();
-const port = 3001; // The backend will run on this port
+const port = 3001;
+// Enable CORS for all origins (you can restrict it later to specific domains if needed)
+app.use((0, cors_1.default)());
 app.use(express_1.default.json());
 app.post('/scrape', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { url, options } = req.body;

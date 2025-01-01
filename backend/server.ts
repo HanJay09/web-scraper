@@ -1,10 +1,13 @@
-// backend/server.ts
 import express from 'express';
+import cors from 'cors'; // Import cors
 import fetch from 'node-fetch';
 import { Buffer } from 'buffer';
 
 const app = express();
-const port = 3001; // The backend will run on this port
+const port = 3001;
+
+// Enable CORS for all origins (you can restrict it later to specific domains if needed)
+app.use(cors());
 
 app.use(express.json());
 
@@ -21,7 +24,7 @@ app.post('/scrape', async (req, res) => {
   const auth = Buffer.from(`${username}:${apiKey}`).toString('base64');
 
   try {
-    const response = await fetch('http://api.scraping-bot.io/scrape', {
+    const response = await fetch('http://api.scraping-bot.io/scrape/retail', {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
@@ -33,7 +36,7 @@ app.post('/scrape', async (req, res) => {
         options,
       }),
     });
-  
+
     const data = await response.json();
     res.json(data);
   } catch (error: unknown) {
