@@ -9,12 +9,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Zap, Plus, BarChart2, Clock, Database, Settings, Search } from 'lucide-react'
 import { supabase } from "@/lib/supabaseClient"
 import { User as SupabaseUser } from "@supabase/supabase-js"
+import { createScrape } from '@/lib/scrapingApi'
+import { ScrapeResult } from "@/types/scraping"
+import { toRelativeString } from "@/utils/date";
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview")
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [scrapeUrl, setScrapeUrl] = useState("");
   const [scrapeType, setScrapeType] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [scrapeResults, setScrapeResults] = useState<ScrapeResult[]>([]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -26,15 +32,99 @@ export default function Dashboard() {
     fetchUser();
   }, []);
 
-  const handleCreateScrape = (e: React.FormEvent) => {
+  const handleCreateScrape = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Here you would typically send this data to your backend
-    console.log("Creating new scrape:", { url: scrapeUrl, type: scrapeType });
-    // Reset form
-    setScrapeUrl("");
-    setScrapeType("");
-    // You could also add some user feedback here, like a success message
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const result = await createScrape(scrapeUrl, {
+        useChrome: false,
+        premiumProxy: false,
+      });
+
+      // Add the new result to the list
+      setScrapeResults(prev => [{
+        url: scrapeUrl,
+        type: scrapeType,
+        timestamp: new Date(),
+        result: result.data,
+      }, ...prev]);
+
+      // Reset form
+      setScrapeUrl("");
+      setScrapeType("");
+      
+      // You might want to show a success message
+      // For example, using toast notification if you have one set up
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred while scraping');
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const RecentScrapesContent = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle>Recent Scrapes</CardTitle>
+        <CardDescription>Your most recent web scraping activities</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {scrapeResults.length > 0 ? (
+            scrapeResults.map((scrape, index) => (
+              <div key={index} className="flex items-center justify-between border-b pb-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium leading-none">
+                    {scrape.result.title || scrape.url}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {scrape.type} • {new Date(scrape.timestamp).toLocaleString()}
+                  </p>
+                  {scrape.result.price && (
+                    <p className="text-sm">
+                      Price: {scrape.result.currency}{scrape.result.price}
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => window.open(scrape.url, '_blank')}
+                  >
+                    Visit Site
+                  </Button>
+                  <Button variant="outline">View Details</Button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              No scrapes yet. Create your first scrape to see results here.
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const RecentActivity = () => (
+    <div className="space-y-8">
+      {scrapeResults.slice(0, 3).map((scrape, index) => (
+        <div key={index} className="flex items-center">
+          <div className="space-y-1">
+            <p className="text-sm font-medium leading-none">
+              {scrape.result.title || `${scrape.type} Scrape`}
+            </p>
+            <p className="text-sm text-muted-foreground">
+            Completed {toRelativeString(new Date(scrape.timestamp))}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-900">
@@ -137,18 +227,7 @@ export default function Dashboard() {
                     <CardDescription>Your latest scraping activities</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-8">
-                      {['Amazon Product Scrape', 'eBay Listing Scrape', 'Etsy Shop Scrape'].map((activity, index) => (
-                        <div key={index} className="flex items-center">
-                          <div className="space-y-1">
-                            <p className="text-sm font-medium leading-none">{activity}</p>
-                            <p className="text-sm text-muted-foreground">
-                              Completed {index + 1} hour{index !== 0 ? 's' : ''} ago
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <RecentActivity />
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -168,45 +247,23 @@ export default function Dashboard() {
                           value={scrapeUrl}
                           onChange={(e) => setScrapeUrl(e.target.value)}
                           required
+                          disabled={isLoading}
                         />
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="scrape-type">Scrape Type</Label>
-                        <Input
-                          id="scrape-type"
-                          placeholder="e.g., Product Listings, Prices, Reviews"
-                          value={scrapeType}
-                          onChange={(e) => setScrapeType(e.target.value)}
-                          required
-                        />
-                      </div>
-                      <Button type="submit">Create Scrape</Button>
+                      {error && (
+                        <div className="text-red-500 text-sm mt-2">
+                          {error}
+                        </div>
+                      )}
+                      <Button type="submit" disabled={isLoading}>
+                        {isLoading ? "Scraping..." : "Create Scrape"}
+                      </Button>
                     </form>
                   </CardContent>
                 </Card>
               </TabsContent>
               <TabsContent value="recent" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Recent Scrapes</CardTitle>
-                    <CardDescription>Your most recent web scraping activities</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {['Amazon Electronics', 'eBay Collectibles', 'Etsy Handmade Jewelry', 'Walmart Groceries', 'Best Buy Laptops'].map((scrape, index) => (
-                        <div key={index} className="flex items-center justify-between">
-                          <div className="space-y-1">
-                            <p className="text-sm font-medium leading-none">{scrape}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {new Date(Date.now() - (index * 3600000)).toLocaleString()}
-                            </p>
-                          </div>
-                          <Button variant="outline">View Results</Button>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                <RecentScrapesContent />
               </TabsContent>
               <TabsContent value="data" className="space-y-4">
                 <Card>
