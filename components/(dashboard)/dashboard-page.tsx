@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Zap, Plus, BarChart2, Clock, Database, Settings, Search } from 'lucide-react'
+import { Zap, Plus, BarChart2, Clock, Database, Settings, Search, Download, ExternalLink } from 'lucide-react'
 import { supabase } from "@/lib/supabaseClient"
 import { User as SupabaseUser } from "@supabase/supabase-js"
 import { createScrape } from '@/lib/scrapingApi'
@@ -15,6 +15,18 @@ import { toRelativeString } from "@/utils/date"
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+const downloadJSON = (data: unknown, filename: string) => {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(url)
+}
+
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview")
   const [user, setUser] = useState<SupabaseUser | null>(null);
@@ -22,7 +34,32 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scrapeResults, setScrapeResults] = useState<ScrapeResult[]>([]);
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filteredData, setFilteredData] = useState<ScrapeResult[]>([])
 
+  useEffect(() => {
+    const filtered = scrapeResults.filter(scrape => 
+      scrape.url.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      scrape.result.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      scrape.result.description.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    setFilteredData(filtered)
+  }, [searchTerm, scrapeResults])
+
+  const handleDownload = (scrape: ScrapeResult) => {
+    const filename = `scrape-${scrape.id || Date.now()}-${new Date(scrape.timestamp).toISOString().split('T')[0]}.json`
+    const downloadData = {
+      url: scrape.url,
+      timestamp: scrape.timestamp,
+      data: scrape.result,
+      type: scrape.type
+    }
+    downloadJSON(downloadData, filename)
+    toast.success('Download started!', {
+      position: "top-right",
+      autoClose: 2000,
+    })
+  }
 
   useEffect(() => {
     const fetchScrapes = async () => {
@@ -79,31 +116,140 @@ export default function Dashboard() {
         useChrome: false,
         premiumProxy: false,
       });
+    
 
-      // Update local state with the result
-      setScrapeResults(prev => [{
-        id: Date.now().toString(),
+    // Store the scrape in Supabase
+    const { data: insertedData, error: insertError } = await supabase
+      .from('scrapes')
+      .insert({
         url: normalizedUrl,
-        timestamp: new Date(),
-        result: result.data,
-        type: 'scrape' // Add the missing 'type' property
-      }, ...prev]);
+        scrape_data: { data: result.data },
+        user_id: user?.id,
+        type: 'product'
+      })
+      .select()
+      .single();
 
-      setUrl("");
-      toast.success('Scraping completed successfully!', {
-        position: "top-right",
-        autoClose: 3000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred while scraping');
-    } finally {
-      setIsLoading(false);
+    if (insertError) {
+      throw new Error('Failed to save scrape data');
     }
-  };
+
+    // Update local state with the inserted data
+    if (insertedData) {
+      const scrapeResult: ScrapeResult = {
+        id: insertedData.id,
+        url: insertedData.url,
+        timestamp: new Date(insertedData.created_at),
+        type: 'product',
+        user_id: insertedData.user_id,
+        result: {
+          title: result.data.title,
+          description: result.data.description,
+          price: result.data.price,
+          currency: result.data.currency,
+          isInStock: result.data.isInStock,
+          image: result.data.image
+        }
+      };
+      
+      setScrapeResults(prev => [scrapeResult, ...prev]);
+    }
+    
+    setUrl("");
+    
+    toast.success('Scraping completed successfully!', {
+      position: "top-right",
+      autoClose: 3000,
+    });
+  } catch (err) {
+    setError(err instanceof Error ? err.message : 'An error occurred while scraping');
+    toast.error(err instanceof Error ? err.message : 'An error occurred while scraping');
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+  const StoredDataContent = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle>Stored Data</CardTitle>
+        <CardDescription>Search and download your scraped product data</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <Input 
+              placeholder="Search by title, description, or URL..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <Button variant="outline">
+              <Search className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="space-y-4">
+            {filteredData.length > 0 ? (
+              filteredData.map((scrape) => (
+                <div key={scrape.id} className="flex items-center justify-between border-b pb-4">
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-sm font-medium leading-none">
+                          {scrape.result.title}
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {toRelativeString(scrape.timestamp)}
+                        </p>
+                      </div>
+                      {scrape.result.image && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img 
+                          src={scrape.result.image} 
+                          alt={scrape.result.title}
+                          className="w-16 h-16 object-cover rounded ml-4"
+                        />
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {scrape.result.description}
+                    </p>
+                    {scrape.result.price && (
+                      <p className="text-sm font-medium">
+                        Price: {scrape.result.currency}{scrape.result.price}
+                      </p>
+                    )}
+                    <p className="text-sm">
+                      Stock Status: {scrape.result.isInStock ? 'In Stock' : 'Out of Stock'}
+                    </p>
+                  </div>
+                  <div className="flex gap-2 ml-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(scrape.url, '_blank')}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownload(scrape)}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No matching scrapes found
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
 
   const RecentScrapesContent = () => (
     <Card>
@@ -114,11 +260,11 @@ export default function Dashboard() {
       <CardContent>
         <div className="space-y-4">
           {scrapeResults.length > 0 ? (
-            scrapeResults.map((scrape) => (
+            scrapeResults.slice(0, 5).map((scrape) => (
               <div key={scrape.id} className="flex items-center justify-between border-b pb-4">
                 <div className="space-y-1">
                   <p className="text-sm font-medium leading-none">
-                    {scrape.result.title || scrape.url}
+                    {scrape.result.title}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {toRelativeString(new Date(scrape.timestamp))}
@@ -128,16 +274,6 @@ export default function Dashboard() {
                       Price: {scrape.result.currency}{scrape.result.price}
                     </p>
                   )}
-                  {scrape.result.features && (
-                    <div className="mt-2">
-                      <p className="text-sm font-medium">Features:</p>
-                      <ul className="list-disc list-inside text-sm text-muted-foreground">
-                        {scrape.result.features.slice(0, 3).map((feature, idx) => (
-                          <li key={idx}>{feature}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -146,14 +282,12 @@ export default function Dashboard() {
                   >
                     Visit Site
                   </Button>
-                  {scrape.result.image && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img 
-                      src={scrape.result.image} 
-                      alt={scrape.result.title}
-                      className="w-20 h-20 object-cover rounded"
-                    />
-                  )}
+                  <Button
+                    variant="outline"
+                    onClick={() => handleDownload(scrape)}
+                  >
+                    Download
+                  </Button>
                 </div>
               </div>
             ))
@@ -165,8 +299,8 @@ export default function Dashboard() {
         </div>
       </CardContent>
     </Card>
-  );
-
+  )
+  
   const RecentActivity = () => (
     <div className="space-y-8">
       {scrapeResults.slice(0, 3).map((scrape, index) => (
@@ -324,36 +458,7 @@ export default function Dashboard() {
                 <RecentScrapesContent />
               </TabsContent>
               <TabsContent value="data" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Stored Data</CardTitle>
-                    <CardDescription>Manage your scraped data</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex items-center space-x-2">
-                        <Input placeholder="Search stored data..." />
-                        <Button type="submit">
-                          <Search className="h-4 w-4" />
-                          <span className="sr-only">Search</span>
-                        </Button>
-                      </div>
-                      <div className="space-y-4">
-                        {['Product Listings', 'Price Comparisons', 'Customer Reviews', 'Competitor Analysis', 'Market Trends'].map((dataset, index) => (
-                          <div key={index} className="flex items-center justify-between">
-                            <div className="space-y-1">
-                              <p className="text-sm font-medium leading-none">{dataset}</p>
-                              <p className="text-sm text-muted-foreground">
-                                Last updated: {new Date(Date.now() - (index * 86400000)).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <Button variant="outline">Download</Button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+              <StoredDataContent />
               </TabsContent>
               <TabsContent value="settings" className="space-y-4">
                 <Card>
