@@ -21,10 +21,12 @@ export function HomePageComponent() {
                   ScraperPro: Your ultimate web scraping solution for Amazon and beyond. Transform raw data into actionable insights.
                 </p>
               </div>
+              <Link href="/login"> 
               <Button className="bg-indigo-600 hover:bg-indigo-700 text-white">
                 Get Started
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
+              </Link>
             </div>
           </div>
         </section>
