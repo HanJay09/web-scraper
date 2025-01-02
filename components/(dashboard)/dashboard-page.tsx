@@ -16,7 +16,7 @@ import { toRelativeString } from "@/utils/date";
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview")
   const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [scrapeUrl, setScrapeUrl] = useState("");
+  const [url, setUrl] = useState('');
   const [scrapeType, setScrapeType] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,21 +38,31 @@ export default function Dashboard() {
     setError(null);
 
     try {
-      const result = await createScrape(scrapeUrl, {
+      if (!url) {
+        throw new Error('Please enter a URL to scrape');
+      }
+  
+      // Normalize and encode the URL
+      let normalizedUrl = url;
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        normalizedUrl = `https://${url}`;
+      }
+
+      const result = await createScrape(url, {
         useChrome: false,
         premiumProxy: false,
       });
 
       // Add the new result to the list
       setScrapeResults(prev => [{
-        url: scrapeUrl,
-        type: scrapeType,
+        url: normalizedUrl,
+        type: scrapeType || 'general',
         timestamp: new Date(),
         result: result.data,
       }, ...prev]);
 
       // Reset form
-      setScrapeUrl("");
+      setUrl("");
       setScrapeType("");
       
       // You might want to show a success message
@@ -244,8 +254,8 @@ export default function Dashboard() {
                         <Input
                           id="scrape-url"
                           placeholder="https://example.com"
-                          value={scrapeUrl}
-                          onChange={(e) => setScrapeUrl(e.target.value)}
+                          value={url}
+                          onChange={(e) => setUrl(e.target.value)}
                           required
                           disabled={isLoading}
                         />

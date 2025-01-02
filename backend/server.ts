@@ -6,13 +6,17 @@ import { Buffer } from 'buffer';
 const app = express();
 const port = 3001;
 
+
 // Enable CORS for all origins (you can restrict it later to specific domains if needed)
 app.use(cors());
 
 app.use(express.json());
 
 app.post('/scrape', async (req, res) => {
+  console.log('Request body:', req.body);  // Log the incoming request body for debugging
   const { url, options } = req.body;
+  console.log(url);       // should log the URL
+  console.log(options);   // should log the options object
 
   const username = process.env.SCRAPING_BOT_USERNAME;
   const apiKey = process.env.SCRAPING_BOT_API_KEY;
@@ -32,8 +36,13 @@ app.post('/scrape', async (req, res) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        url,
-        options,
+        url: url,
+        options: {
+          useChrome: options.useChrome ?? false,
+          premiumProxy: options.premiumProxy ?? true,
+          proxyCountry: "MY",
+          waitForNetworkRequests: options.waitForNetworkRequests ?? false,
+        },
       }),
     });
 

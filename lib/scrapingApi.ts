@@ -23,13 +23,26 @@ export async function createScrape(
     url: string,
     options: ScrapingOptions = {}
   ): Promise<ScrapingResponse> {
+    const requestBody = JSON.stringify({
+        url: url,
+        ...options
+      });
+    console.log('Request Body:', requestBody);
     const response = await fetch('http://localhost:3001/scrape', {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ url, options }),
+      body: JSON.stringify({
+        url: url,
+        options: {
+          useChrome: options.useChrome ?? false,
+          premiumProxy: options.premiumProxy ?? true,
+          proxyCountry: "MY",
+          waitForNetworkRequests: options.waitForNetworkRequests ?? false,
+        },
+      }),
     });
   
     if (!response.ok) {
