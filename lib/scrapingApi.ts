@@ -21,79 +21,77 @@ interface ScrapingResponse {
     currency: string;
     isInStock: boolean;
     siteURL: string;
-    // ... other fields
   };
 }
 
 export async function createScrape(
-    url: string,
-    options: ScrapingOptions = {}
-  ): Promise<ScrapingResponse> {
-    try {
-      // Get the current session
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.user) {
-        throw new Error('You must be logged in to create scrapes');
-      }
-  
-      const requestBody = {
-        url,
-        options: {
-          useChrome: options.useChrome ?? false,
-          premiumProxy: options.premiumProxy ?? true,
-          proxyCountry: "MY",
-          waitForNetworkRequests: options.waitForNetworkRequests ?? false,
-        },
-      };
-  
-      const response = await fetch('http://localhost:3001/scrape', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-  
-      const data = await response.json();
-  
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to scrape data');
-      }
-  
-      // Save to Supabase with user_id
-      const { error: saveError } = await supabase
-        .from('scrapes')
-        .insert({
-          url,
-          scrape_data: data,
-          user_id: session.user.id, // Add the user_id explicitly
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-  
-      if (saveError) {
-        console.error('Error saving scrape result:', saveError);
-        throw new Error('Failed to save scrape result');
-      }
-  
-      return data;
-    } catch (error) {
-      console.error('Error in createScrape:', error);
-      throw error;
+  url: string,
+  options: ScrapingOptions = {}
+): Promise<ScrapingResponse> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session?.user) {
+      throw new Error('You must be logged in to create scrapes');
     }
-  }
 
-// Function to fetch recent scrapes for the current user
+    const requestBody = {
+      url,
+      options: {
+        useChrome: options.useChrome ?? false,
+        premiumProxy: options.premiumProxy ?? true,
+        proxyCountry: "MY",
+        waitForNetworkRequests: options.waitForNetworkRequests ?? false,
+      },
+    };
+
+    const response = await fetch('http://localhost:3001/scrape', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to scrape data');
+    }
+
+    const scrapedData = await response.json();
+
+    // Save to Supabase
+    const { error: saveError } = await supabase
+      .from('scrapes')
+      .insert({
+        url,
+        user_id: session.user.id,
+        scrape_data: scrapedData,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (saveError) {
+      console.error('Error saving scrape result:', saveError);
+      throw new Error('Failed to save scrape result');
+    }
+
+    return scrapedData;
+  } catch (error) {
+    console.error('Error in createScrape:', error);
+    throw error;
+  }
+}
+
 export async function getRecentScrapes() {
   try {
     const { data, error } = await supabase
       .from('scrapes')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(10); // Adjust limit as needed
+      .limit(10);
 
     if (error) {
       throw error;

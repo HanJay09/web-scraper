@@ -12,16 +12,17 @@ import { User as SupabaseUser } from "@supabase/supabase-js"
 import { createScrape } from '@/lib/scrapingApi'
 import { ScrapeResult } from "@/types/scraping"
 import { toRelativeString } from "@/utils/date"
-
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview")
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [url, setUrl] = useState('');
-  const [scrapeType, setScrapeType] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scrapeResults, setScrapeResults] = useState<ScrapeResult[]>([]);
+
 
   useEffect(() => {
     const fetchScrapes = async () => {
@@ -40,9 +41,9 @@ export default function Dashboard() {
       setScrapeResults(data.map(scrape => ({
         id: scrape.id,
         url: scrape.url,
-        type: scrape.type || 'general',
         timestamp: new Date(scrape.created_at),
-        result: scrape.scrape_data.data
+        result: scrape.scrape_data.data,
+        type: 'scrape' // Add the missing 'type' property
       })));
     };
 
@@ -79,33 +80,24 @@ export default function Dashboard() {
         premiumProxy: false,
       });
 
-      // Save to Supabase
-      const { data: savedScrape, error: saveError } = await supabase
-        .from('scrapes')
-        .insert({
-          url: normalizedUrl,
-          type: scrapeType || 'general',
-          user_id: user?.id,
-          scrape_data: result
-        })
-        .select()
-        .single();
-
-      if (saveError) {
-        throw new Error('Failed to save scrape result');
-      }
-
-      // Update local state
+      // Update local state with the result
       setScrapeResults(prev => [{
-        id: savedScrape.id,
+        id: Date.now().toString(),
         url: normalizedUrl,
-        type: scrapeType || 'general',
         timestamp: new Date(),
-        result: result.data
+        result: result.data,
+        type: 'scrape' // Add the missing 'type' property
       }, ...prev]);
 
       setUrl("");
-      setScrapeType("");
+      toast.success('Scraping completed successfully!', {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred while scraping');
     } finally {
@@ -129,7 +121,7 @@ export default function Dashboard() {
                     {scrape.result.title || scrape.url}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {scrape.type} • {new Date(scrape.timestamp).toLocaleString()}
+                    {toRelativeString(new Date(scrape.timestamp))}
                   </p>
                   {scrape.result.price && (
                     <p className="text-sm font-medium">
@@ -175,17 +167,16 @@ export default function Dashboard() {
     </Card>
   );
 
-
   const RecentActivity = () => (
     <div className="space-y-8">
       {scrapeResults.slice(0, 3).map((scrape, index) => (
         <div key={index} className="flex items-center">
           <div className="space-y-1">
             <p className="text-sm font-medium leading-none">
-              {scrape.result.title || `${scrape.type} Scrape`}
+              {scrape.result.title || 'Web Scrape'}
             </p>
             <p className="text-sm text-muted-foreground">
-            Completed {toRelativeString(new Date(scrape.timestamp))}
+              Completed {toRelativeString(new Date(scrape.timestamp))}
             </p>
           </div>
         </div>
@@ -393,6 +384,7 @@ export default function Dashboard() {
           </div>
         </main>
       </div>
+      <ToastContainer />
     </div>
   )
 }
