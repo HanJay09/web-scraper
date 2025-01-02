@@ -11,7 +11,8 @@ import { supabase } from "@/lib/supabaseClient"
 import { User as SupabaseUser } from "@supabase/supabase-js"
 import { createScrape } from '@/lib/scrapingApi'
 import { ScrapeResult } from "@/types/scraping"
-import { toRelativeString } from "@/utils/date";
+import { toRelativeString } from "@/utils/date"
+
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview")
@@ -21,6 +22,32 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scrapeResults, setScrapeResults] = useState<ScrapeResult[]>([]);
+
+  useEffect(() => {
+    const fetchScrapes = async () => {
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from('scrapes')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching scrapes:', error);
+        return;
+      }
+
+      setScrapeResults(data.map(scrape => ({
+        id: scrape.id,
+        url: scrape.url,
+        type: scrape.type || 'general',
+        timestamp: new Date(scrape.created_at),
+        result: scrape.scrape_data.data
+      })));
+    };
+
+    fetchScrapes();
+  }, [user]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -41,32 +68,44 @@ export default function Dashboard() {
       if (!url) {
         throw new Error('Please enter a URL to scrape');
       }
-  
-      // Normalize and encode the URL
+
       let normalizedUrl = url;
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
         normalizedUrl = `https://${url}`;
       }
 
-      const result = await createScrape(url, {
+      const result = await createScrape(normalizedUrl, {
         useChrome: false,
         premiumProxy: false,
       });
 
-      // Add the new result to the list
+      // Save to Supabase
+      const { data: savedScrape, error: saveError } = await supabase
+        .from('scrapes')
+        .insert({
+          url: normalizedUrl,
+          type: scrapeType || 'general',
+          user_id: user?.id,
+          scrape_data: result
+        })
+        .select()
+        .single();
+
+      if (saveError) {
+        throw new Error('Failed to save scrape result');
+      }
+
+      // Update local state
       setScrapeResults(prev => [{
+        id: savedScrape.id,
         url: normalizedUrl,
         type: scrapeType || 'general',
         timestamp: new Date(),
-        result: result.data,
+        result: result.data
       }, ...prev]);
 
-      // Reset form
       setUrl("");
       setScrapeType("");
-      
-      // You might want to show a success message
-      // For example, using toast notification if you have one set up
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred while scraping');
     } finally {
@@ -83,8 +122,8 @@ export default function Dashboard() {
       <CardContent>
         <div className="space-y-4">
           {scrapeResults.length > 0 ? (
-            scrapeResults.map((scrape, index) => (
-              <div key={index} className="flex items-center justify-between border-b pb-4">
+            scrapeResults.map((scrape) => (
+              <div key={scrape.id} className="flex items-center justify-between border-b pb-4">
                 <div className="space-y-1">
                   <p className="text-sm font-medium leading-none">
                     {scrape.result.title || scrape.url}
@@ -93,9 +132,19 @@ export default function Dashboard() {
                     {scrape.type} • {new Date(scrape.timestamp).toLocaleString()}
                   </p>
                   {scrape.result.price && (
-                    <p className="text-sm">
+                    <p className="text-sm font-medium">
                       Price: {scrape.result.currency}{scrape.result.price}
                     </p>
+                  )}
+                  {scrape.result.features && (
+                    <div className="mt-2">
+                      <p className="text-sm font-medium">Features:</p>
+                      <ul className="list-disc list-inside text-sm text-muted-foreground">
+                        {scrape.result.features.slice(0, 3).map((feature, idx) => (
+                          <li key={idx}>{feature}</li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                 </div>
                 <div className="flex gap-2">
@@ -105,7 +154,14 @@ export default function Dashboard() {
                   >
                     Visit Site
                   </Button>
-                  <Button variant="outline">View Details</Button>
+                  {scrape.result.image && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img 
+                      src={scrape.result.image} 
+                      alt={scrape.result.title}
+                      className="w-20 h-20 object-cover rounded"
+                    />
+                  )}
                 </div>
               </div>
             ))
@@ -118,6 +174,7 @@ export default function Dashboard() {
       </CardContent>
     </Card>
   );
+
 
   const RecentActivity = () => (
     <div className="space-y-8">
