@@ -1,33 +1,53 @@
 import express from 'express';
-import cors from 'cors'; // Import cors
+import cors from 'cors';
 import fetch from 'node-fetch';
 import { Buffer } from 'buffer';
+import dotenv from 'dotenv';
+
+// Configure dotenv at the very beginning
+dotenv.config();
 
 const app = express();
 const port = 3001;
 
+// Add some debug logging
+console.log('Environment variables loaded:', {
+  username: process.env.SCRAPING_BOT_USERNAME ? 'Present' : 'Missing',
+  apiKey: process.env.SCRAPING_BOT_API_KEY ? 'Present' : 'Missing'
+});
 
-// Enable CORS for all origins (you can restrict it later to specific domains if needed)
 app.use(cors());
-
 app.use(express.json());
 
 app.post('/scrape', async (req, res) => {
-  console.log('Request body:', req.body);  // Log the incoming request body for debugging
   const { url, options } = req.body;
-  console.log(url);       // should log the URL
-  console.log(options);   // should log the options object
+  console.log('Received request:', { url, options });
 
   const username = process.env.SCRAPING_BOT_USERNAME;
   const apiKey = process.env.SCRAPING_BOT_API_KEY;
 
   if (!username || !apiKey) {
-    return res.status(400).json({ error: 'Missing API credentials' });
+    console.error('Missing credentials:', { 
+      hasUsername: !!username, 
+      hasApiKey: !!apiKey 
+    });
+    return res.status(400).json({ 
+      error: 'Missing API credentials', 
+      details: {
+        username: !!username,
+        apiKey: !!apiKey
+      }
+    });
+  }
+
+  if (!url) {
+    return res.status(400).json({ error: 'URL is required' });
   }
 
   const auth = Buffer.from(`${username}:${apiKey}`).toString('base64');
-
+  
   try {
+    console.log('Making request to scraping-bot.io with URL:', url);
     const response = await fetch('http://api.scraping-bot.io/scrape/retail', {
       method: 'POST',
       headers: {
@@ -38,21 +58,22 @@ app.post('/scrape', async (req, res) => {
       body: JSON.stringify({
         url: url,
         options: {
-          useChrome: options.useChrome ?? false,
-          premiumProxy: options.premiumProxy ?? true,
+          useChrome: options?.useChrome ?? false,
+          premiumProxy: options?.premiumProxy ?? true,
           proxyCountry: "MY",
-          waitForNetworkRequests: options.waitForNetworkRequests ?? false,
+          waitForNetworkRequests: options?.waitForNetworkRequests ?? false,
         },
       }),
     });
 
     const data = await response.json();
+    console.log('Response from scraping-bot.io:', data);
     res.json(data);
   } catch (error: unknown) {
-    // Type assertion
     const err = error as Error;
+    console.error('Scraping error:', err);
     res.status(500).json({ error: 'Scraping error', details: err.message });
-  }  
+  }
 });
 
 app.listen(port, () => {
