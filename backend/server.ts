@@ -16,7 +16,15 @@ console.log('Environment variables loaded:', {
   apiKey: process.env.SCRAPING_BOT_API_KEY ? 'Present' : 'Missing'
 });
 
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://scraperpro.vercel.app',
+    'http://localhost:3000'  // for local development
+  ],
+  methods: ['GET', 'POST'],
+  credentials: true
+}));
+
 app.use(express.json());
 
 app.post('/scrape', async (req, res) => {
