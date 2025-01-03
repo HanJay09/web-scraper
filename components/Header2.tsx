@@ -39,9 +39,9 @@ export function Header2() {
       <nav className="ml-auto flex items-center gap-4 sm:gap-6">
         <Link
           className="text-sm font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400 transition-colors"
-          href="/features"
+          href="/dashboard"
         >
-          Features
+          Dashboard
         </Link>
         <Link
           className="text-sm font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400 transition-colors"
