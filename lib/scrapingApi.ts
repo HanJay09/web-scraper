@@ -15,6 +15,7 @@ interface ScrapingOptions {
 interface ScrapingResponse {
   error: string | null;
   data: {
+    image: string | undefined;
     title: string;
     description: string;
     price: number;

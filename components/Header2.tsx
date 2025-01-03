@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from "@/components/ui/button";
-import { Zap, LogOut, User } from "lucide-react";
+import { Zap, LogOut } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient"; // Adjust import path based on your project structure
@@ -64,15 +64,6 @@ export function Header2() {
 
         {user ? (
           <>
-            <Link
-              className="hidden sm:inline-flex text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors"
-              href="/profile"
-            >
-              <Button variant="outline" size="sm" className="flex items-center gap-2">
-                <User className="h-4 w-4" />
-                Profile
-              </Button>
-            </Link>
             <Button size="sm" className="hidden sm:inline-flex" onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4" />
               Log Out

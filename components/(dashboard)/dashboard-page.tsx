@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -6,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Zap, Plus, BarChart2, Clock, Database, Settings, Search, Download, ExternalLink } from 'lucide-react'
+import { Zap, Plus, BarChart2, Clock, Database, Settings, ExternalLink, Download } from 'lucide-react'
 import { supabase } from "@/lib/supabaseClient"
 import { User as SupabaseUser } from "@supabase/supabase-js"
 import { createScrape } from '@/lib/scrapingApi'
@@ -14,6 +15,7 @@ import { ScrapeResult } from "@/types/scraping"
 import { toRelativeString } from "@/utils/date"
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { Footer } from '@/components/Footer';
 
 const downloadJSON = (data: unknown, filename: string) => {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -34,32 +36,8 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scrapeResults, setScrapeResults] = useState<ScrapeResult[]>([]);
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filteredData, setFilteredData] = useState<ScrapeResult[]>([])
-
-  useEffect(() => {
-    const filtered = scrapeResults.filter(scrape => 
-      scrape.url.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      scrape.result.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      scrape.result.description.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    setFilteredData(filtered)
-  }, [searchTerm, scrapeResults])
-
-  const handleDownload = (scrape: ScrapeResult) => {
-    const filename = `scrape-${scrape.id || Date.now()}-${new Date(scrape.timestamp).toISOString().split('T')[0]}.json`
-    const downloadData = {
-      url: scrape.url,
-      timestamp: scrape.timestamp,
-      data: scrape.result,
-      type: scrape.type
-    }
-    downloadJSON(downloadData, filename)
-    toast.success('Download started!', {
-      position: "top-right",
-      autoClose: 2000,
-    })
-  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [selectedScrape, setSelectedScrape] = useState<any | null>(null);
 
   useEffect(() => {
     const fetchScrapes = async () => {
@@ -80,7 +58,7 @@ export default function Dashboard() {
         url: scrape.url,
         timestamp: new Date(scrape.created_at),
         result: scrape.scrape_data.data,
-        type: 'scrape' // Add the missing 'type' property
+        type: 'scrape'
       })));
     };
 
@@ -96,6 +74,26 @@ export default function Dashboard() {
     };
     fetchUser();
   }, []);
+
+  const handleViewDetails = (scrape: unknown) => {
+    setSelectedScrape(scrape)
+    setActiveTab("details")
+  }
+
+  const handleDownload = (scrape: ScrapeResult) => {
+    const filename = `scrape-${scrape.id || Date.now()}-${new Date(scrape.timestamp).toISOString().split('T')[0]}.json`
+    const downloadData = {
+      url: scrape.url,
+      timestamp: scrape.timestamp,
+      data: scrape.result,
+      type: scrape.type
+    }
+    downloadJSON(downloadData, filename)
+    toast.success('Download started!', {
+      position: "top-right",
+      autoClose: 2000,
+    })
+  }
 
   const handleCreateScrape = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,140 +114,121 @@ export default function Dashboard() {
         useChrome: false,
         premiumProxy: false,
       });
-    
 
-    // Store the scrape in Supabase
-    const { data: insertedData, error: insertError } = await supabase
-      .from('scrapes')
-      .insert({
-        url: normalizedUrl,
-        scrape_data: { data: result.data },
-        user_id: user?.id,
-        type: 'product'
-      })
-      .select()
-      .single();
+      const { data: insertedData, error: insertError } = await supabase
+        .from('scrapes')
+        .insert({
+          url: normalizedUrl,
+          scrape_data: { data: result.data },
+          user_id: user?.id,
+          type: 'product'
+        })
+        .select()
+        .single();
 
-    if (insertError) {
-      throw new Error('Failed to save scrape data');
-    }
+      if (insertError) {
+        throw new Error('Failed to save scrape data');
+      }
 
-    // Update local state with the inserted data
-    if (insertedData) {
-      const scrapeResult: ScrapeResult = {
-        id: insertedData.id,
-        url: insertedData.url,
-        timestamp: new Date(insertedData.created_at),
-        type: 'product',
-        user_id: insertedData.user_id,
-        result: {
-          title: result.data.title,
-          description: result.data.description,
-          price: result.data.price,
-          currency: result.data.currency,
-          isInStock: result.data.isInStock,
-          image: result.data.image
-        }
-      };
+      if (insertedData) {
+        const scrapeResult: ScrapeResult = {
+          id: insertedData.id,
+          url: insertedData.url,
+          timestamp: new Date(insertedData.created_at),
+          type: 'product',
+          user_id: insertedData.user_id,
+          result: {
+            title: result.data.title,
+            description: result.data.description,
+            price: result.data.price,
+            currency: result.data.currency,
+            isInStock: result.data.isInStock,
+            image: result.data.image
+          }
+        };
+        
+        setScrapeResults(prev => [scrapeResult, ...prev]);
+      }
       
-      setScrapeResults(prev => [scrapeResult, ...prev]);
+      setUrl("");
+      
+      toast.success('Scraping completed successfully!', {
+        position: "top-right",
+        autoClose: 3000,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred while scraping');
+      toast.error(err instanceof Error ? err.message : 'An error occurred while scraping');
+    } finally {
+      setIsLoading(false);
     }
-    
-    setUrl("");
-    
-    toast.success('Scraping completed successfully!', {
-      position: "top-right",
-      autoClose: 3000,
-    });
-  } catch (err) {
-    setError(err instanceof Error ? err.message : 'An error occurred while scraping');
-    toast.error(err instanceof Error ? err.message : 'An error occurred while scraping');
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
-  const StoredDataContent = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>Stored Data</CardTitle>
-        <CardDescription>Search and download your scraped product data</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div className="flex items-center space-x-2">
-            <Input 
-              placeholder="Search by title, description, or URL..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <Button variant="outline">
-              <Search className="h-4 w-4" />
-            </Button>
-          </div>
+  // Component for displaying scrape details
+  const ScrapeDetailsContent = () => {
+    if (!selectedScrape) {
+      return (
+        <Card>
+          <CardContent className="py-8">
+            <div className="text-center text-muted-foreground">
+              No scrape selected. Please select a scrape to view details.
+            </div>
+          </CardContent>
+        </Card>
+      )
+    }
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Scrape Details</CardTitle>
+          <CardDescription>Detailed information about your selected scrape</CardDescription>
+        </CardHeader>
+        <CardContent>
           <div className="space-y-4">
-            {filteredData.length > 0 ? (
-              filteredData.map((scrape) => (
-                <div key={scrape.id} className="flex items-center justify-between border-b pb-4">
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-sm font-medium leading-none">
-                          {scrape.result.title}
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {toRelativeString(scrape.timestamp)}
-                        </p>
-                      </div>
-                      {scrape.result.image && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img 
-                          src={scrape.result.image} 
-                          alt={scrape.result.title}
-                          className="w-16 h-16 object-cover rounded ml-4"
-                        />
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {scrape.result.description}
-                    </p>
-                    {scrape.result.price && (
-                      <p className="text-sm font-medium">
-                        Price: {scrape.result.currency}{scrape.result.price}
-                      </p>
-                    )}
-                    <p className="text-sm">
-                      Stock Status: {scrape.result.isInStock ? 'In Stock' : 'Out of Stock'}
-                    </p>
-                  </div>
-                  <div className="flex gap-2 ml-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(scrape.url, '_blank')}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDownload(scrape)}
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                No matching scrapes found
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-lg font-medium">{selectedScrape.result.title}</p>
+                <p className="text-sm text-muted-foreground">
+                  Scraped {toRelativeString(selectedScrape.timestamp)}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => window.open(selectedScrape.url, '_blank')}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Visit Site
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => handleDownload(selectedScrape)}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Data (JSON format)
+                </Button>
+              </div>
+            </div>
+            {selectedScrape.result.image && (
+              <div className="mt-4">
+                <img
+                  src={selectedScrape.result.image}
+                  alt="Scrape preview"
+                  className="w-full max-w-md rounded-lg shadow-md"
+                />
               </div>
             )}
+            <div className="mt-4 space-y-2">
+              <p><strong>Description:</strong> {selectedScrape.result.description}</p>
+              <p><strong>Price:</strong> {selectedScrape.result.currency}{selectedScrape.result.price}</p>
+              <p><strong>Stock Status:</strong> {selectedScrape.result.isInStock ? 'In Stock' : 'Out of Stock'}</p>
+              <p><strong>URL:</strong> {selectedScrape.url}</p>
+            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
+        </CardContent>
+      </Card>
+    )
+  }
 
   const RecentScrapesContent = () => (
     <Card>
@@ -282,12 +261,7 @@ export default function Dashboard() {
                   >
                     Visit Site
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => handleDownload(scrape)}
-                  >
-                    Download
-                  </Button>
+                  <Button variant="outline" onClick={() => handleViewDetails(scrape)}>View Details</Button>
                 </div>
               </div>
             ))
@@ -336,10 +310,6 @@ export default function Dashboard() {
               <Clock className="mr-2 h-4 w-4" />
               Recent Scrapes
             </Button>
-            <Button variant="ghost" className="w-full justify-start" onClick={() => setActiveTab("data")}>
-              <Database className="mr-2 h-4 w-4" />
-              Stored Data
-            </Button>
             <Button variant="ghost" className="w-full justify-start" onClick={() => setActiveTab("settings")}>
               <Settings className="mr-2 h-4 w-4" />
               Settings
@@ -367,7 +337,7 @@ export default function Dashboard() {
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="create">Create Scrape</TabsTrigger>
                 <TabsTrigger value="recent">Recent Scrapes</TabsTrigger>
-                <TabsTrigger value="data">Stored Data</TabsTrigger>
+                {/* <TabsTrigger value="details">Details</TabsTrigger> */}
                 <TabsTrigger value="settings">Settings</TabsTrigger>
               </TabsList>
               <TabsContent value="overview" className="space-y-4">
@@ -378,8 +348,8 @@ export default function Dashboard() {
                       <BarChart2 className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">1,234</div>
-                      <p className="text-xs text-muted-foreground">+20.1% from last month</p>
+                      <div className="text-2xl font-bold">{scrapeResults.length}</div>
+                      <p className="text-xs text-muted-foreground">Total scrapes performed</p>
                     </CardContent>
                   </Card>
                   <Card>
@@ -388,8 +358,8 @@ export default function Dashboard() {
                       <Database className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">2,345,678</div>
-                      <p className="text-xs text-muted-foreground">+15% from last month</p>
+                      <div className="text-2xl font-bold">{scrapeResults.length * 5}</div>
+                      <p className="text-xs text-muted-foreground">Total data points collected</p>
                     </CardContent>
                   </Card>
                   <Card>
@@ -398,8 +368,8 @@ export default function Dashboard() {
                       <Zap className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">12</div>
-                      <p className="text-xs text-muted-foreground">+2 new this week</p>
+                      <div className="text-2xl font-bold">1</div>
+                      <p className="text-xs text-muted-foreground">Current active project</p>
                     </CardContent>
                   </Card>
                   <Card>
@@ -408,7 +378,7 @@ export default function Dashboard() {
                       <BarChart2 className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">85%</div>
+                      <div className="text-2xl font-bold">{scrapeResults.length}%</div>
                       <p className="text-xs text-muted-foreground">of monthly limit</p>
                     </CardContent>
                   </Card>
@@ -457,8 +427,8 @@ export default function Dashboard() {
               <TabsContent value="recent" className="space-y-4">
                 <RecentScrapesContent />
               </TabsContent>
-              <TabsContent value="data" className="space-y-4">
-              <StoredDataContent />
+              <TabsContent value="details" className="space-y-4">
+                <ScrapeDetailsContent />
               </TabsContent>
               <TabsContent value="settings" className="space-y-4">
                 <Card>
@@ -489,6 +459,7 @@ export default function Dashboard() {
           </div>
         </main>
       </div>
+      <Footer />
       <ToastContainer />
     </div>
   )
