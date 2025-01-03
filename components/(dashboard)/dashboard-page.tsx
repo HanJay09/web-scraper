@@ -16,6 +16,7 @@ import { toRelativeString } from "@/utils/date"
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Footer } from '@/components/Footer';
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 const downloadJSON = (data: unknown, filename: string) => {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -38,6 +39,64 @@ export default function Dashboard() {
   const [scrapeResults, setScrapeResults] = useState<ScrapeResult[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedScrape, setSelectedScrape] = useState<any | null>(null);
+  const [displayName, setDisplayName] = useState('')
+  const [isResetEmailSent, setIsResetEmailSent] = useState(false)
+  const [updateMessage, setUpdateMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+
+  useEffect(() => {
+    if (user?.user_metadata?.full_name) {
+      setDisplayName(user.user_metadata.full_name)
+    }
+  }, [user])
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: { full_name: displayName }
+      });
+
+      if (error) throw error;
+      
+      toast.success('Profile updated successfully!');
+    } catch (error) {
+      setUpdateMessage({ 
+        type: 'error', 
+        text: error instanceof Error ? error.message : 'Error updating profile' 
+      });
+      toast.error('Error updating profile');
+    }
+  };
+
+  const handlePasswordResetRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        user?.email || '',
+        {
+          redirectTo: `${window.location.origin}/auth/update-password?next=/dashboard`
+        }
+      );
+  
+      if (error) throw error;
+  
+      setIsResetEmailSent(true);
+      setUpdateMessage({ 
+        type: 'success', 
+        text: 'Password reset email sent! Please check your email to complete the process.' 
+      });
+      toast.success('Password reset email sent!');
+    } catch (error) {
+      setUpdateMessage({ 
+        type: 'error', 
+        text: error instanceof Error ? error.message : 'Error sending reset email' 
+      });
+      toast.error('Error sending reset email');
+    }
+  };
 
   useEffect(() => {
     const fetchScrapes = async () => {
@@ -312,7 +371,7 @@ export default function Dashboard() {
             </Button>
             <Button variant="ghost" className="w-full justify-start" onClick={() => setActiveTab("settings")}>
               <Settings className="mr-2 h-4 w-4" />
-              Settings
+              Profile Settings
             </Button>
           </nav>
         </aside>
@@ -338,7 +397,7 @@ export default function Dashboard() {
                 <TabsTrigger value="create">Create Scrape</TabsTrigger>
                 <TabsTrigger value="recent">Recent Scrapes</TabsTrigger>
                 {/* <TabsTrigger value="details">Details</TabsTrigger> */}
-                <TabsTrigger value="settings">Settings</TabsTrigger>
+                <TabsTrigger value="settings">Profile Settings</TabsTrigger>
               </TabsList>
               <TabsContent value="overview" className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -431,30 +490,66 @@ export default function Dashboard() {
                 <ScrapeDetailsContent />
               </TabsContent>
               <TabsContent value="settings" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Account Settings</CardTitle>
-                    <CardDescription>Manage your account preferences</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <form className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Name</Label>
-                        <Input id="name" placeholder="John Doe" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input id="email" type="email" placeholder="john@example.com" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="api-key">API Key</Label>
-                        <Input id="api-key" placeholder="Your API Key" />
-                      </div>
-                      <Button>Save Changes</Button>
-                    </form>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+              <Card>
+                <CardHeader>
+                  <CardTitle>My Profile</CardTitle>
+                  <CardDescription>Manage your profile information</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {updateMessage && (
+                    <Alert variant={updateMessage.type === 'success' ? 'default' : 'destructive'}>
+                      <AlertDescription>{updateMessage.text}</AlertDescription>
+                    </Alert>
+                  )}
+                  
+                  <form onSubmit={handleUpdateProfile} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={user?.email || ''}
+                        disabled
+                        className="bg-muted"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="displayName">Display Name</Label>
+                      <Input
+                        id="displayName"
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        placeholder="Enter your display name"
+                      />
+                    </div>
+                    <Button type="submit">Update Profile</Button>
+                  </form>
+
+                  <div className="border-t pt-4">
+                    <h3 className="text-lg font-medium mb-4">Change Password</h3>
+                    <div className="space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        To change your password, we&apos;ll send you an email with a secure reset link.
+                        Click the button below to start the process.
+                      </p>
+                      {isResetEmailSent ? (
+                        <Alert>
+                          <AlertDescription>
+                            Password reset email sent! Please check your email to complete the process.
+                            If you don&apos;t see the email, please check your spam folder.
+                          </AlertDescription>
+                        </Alert>
+                      ) : (
+                        <Button onClick={handlePasswordResetRequest}>
+                          Send Password Reset Email
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
             </Tabs>
           </div>
         </main>
