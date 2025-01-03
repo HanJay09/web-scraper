@@ -32,7 +32,7 @@ export function Header2() {
 
   return (
     <header className="px-4 lg:px-6 h-16 flex items-center fixed w-full backdrop-blur-md bg-white/30 dark:bg-gray-900/30 border-b border-gray-200 dark:border-gray-800 z-50">
-      <Link className="flex items-center justify-center" href="/">
+      <Link className="flex items-center justify-center" href="/dashboard">
         <Zap className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
         <span className="ml-2 text-xl font-bold text-gray-900 dark:text-white">ScraperPro</span>
       </Link>
