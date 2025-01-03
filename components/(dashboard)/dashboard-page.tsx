@@ -174,53 +174,67 @@ export default function Dashboard() {
         premiumProxy: false,
       });
 
-      const { data: insertedData, error: insertError } = await supabase
-        .from('scrapes')
-        .insert({
-          url: normalizedUrl,
-          scrape_data: { data: result.data },
-          user_id: user?.id,
-          type: 'product'
-        })
-        .select()
-        .single();
+      // Then try to insert into Supabase with retry logic
+      let retryCount = 0;
+      const maxRetries = 3;
 
-      if (insertError) {
-        throw new Error('Failed to save scrape data');
-      }
-
-      if (insertedData) {
-        const scrapeResult: ScrapeResult = {
-          id: insertedData.id,
-          url: insertedData.url,
-          timestamp: new Date(insertedData.created_at),
-          type: 'product',
-          user_id: insertedData.user_id,
-          result: {
-            title: result.data.title,
-            description: result.data.description,
-            price: result.data.price,
-            currency: result.data.currency,
-            isInStock: result.data.isInStock,
-            image: result.data.image
+      while (retryCount < maxRetries) {
+        const { data: insertedData, error: insertError } = await supabase
+          .from('scrapes')
+          .insert({
+            url: normalizedUrl,
+            scrape_data: { data: result.data },
+            user_id: user?.id,
+            
+          })
+          .select()
+          .single();
+  
+        if (!insertError) {
+          // Success! Add to UI
+          if (insertedData) {
+            const scrapeResult: ScrapeResult = {
+              id: insertedData.id,
+              url: insertedData.url,
+              timestamp: new Date(insertedData.created_at),
+              type: 'product',
+              user_id: insertedData.user_id,
+              result: {
+                title: result.data.title,
+                description: result.data.description,
+                price: result.data.price,
+                currency: result.data.currency,
+                isInStock: result.data.isInStock,
+                image: result.data.image
+              }
+            };
+            
+            setScrapeResults(prev => [scrapeResult, ...prev]);
           }
-        };
+          
+          setUrl("");
+          toast.success('Scraping completed successfully!');
+          break;
+        }
+  
+        // If there's an error, wait a bit and retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        retryCount++;
         
-        setScrapeResults(prev => [scrapeResult, ...prev]);
+        // Only show error on final retry
+        if (retryCount === maxRetries) {
+          console.error('Supabase insert error:', insertError);
+          throw new Error('Failed to save scrape data after multiple attempts');
+        }
       }
-      
-      setUrl("");
-      
-      toast.success('Scraping completed successfully!', {
-        position: "top-right",
-        autoClose: 3000,
-      });
+  
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred while scraping');
       toast.error(err instanceof Error ? err.message : 'An error occurred while scraping');
     } finally {
       setIsLoading(false);
     }
+  
   };
 
   // Component for displaying scrape details
