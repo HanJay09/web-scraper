@@ -4,22 +4,36 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
         function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { return result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-import express from 'express';
+const express_1 = __importDefault(require("express"));
+const cors_1 = __importDefault(require("cors"));
+const node_fetch_1 = __importDefault(require("node-fetch"));
+const buffer_1 = require("buffer");
+const dotenv_1 = __importDefault(require("dotenv"));
 // Configure dotenv at the very beginning
 dotenv_1.default.config();
-const app = express();
+const app = (0, express_1.default)();
 const port = 3001;
 // Add some debug logging
 console.log('Environment variables loaded:', {
     username: process.env.SCRAPING_BOT_USERNAME ? 'Present' : 'Missing',
     apiKey: process.env.SCRAPING_BOT_API_KEY ? 'Present' : 'Missing'
 });
-app.use((0, cors_1.default)());
+app.use((0, cors_1.default)({
+    origin: [
+        'https://scraperpro.vercel.app',
+        'http://localhost:3000' // for local development
+    ],
+    methods: ['GET', 'POST'],
+    credentials: true
+}));
 app.use(express_1.default.json());
 app.post('/scrape', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c;

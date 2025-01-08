@@ -27,7 +27,7 @@ export function ContactPageComponent() {
           Accept: "application/json",
         },
         body: JSON.stringify({
-          access_key: "1c330694-4543-42b4-bfcc-de9a26b1d53e", // Replace with your actual access key
+          access_key: "1c330694-4543-42b4-bfcc-de9a26b1d53e", // API access key
           name,
           email,
           message,
