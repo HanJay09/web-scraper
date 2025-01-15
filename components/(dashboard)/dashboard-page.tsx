@@ -496,6 +496,19 @@ export default function Dashboard() {
                     </form>
                   </CardContent>
                 </Card>
+                <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+                      <div className="px-4 py-5 sm:p-6">
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-white">Instructions</h3>
+                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">How to use the scraping feature:</p>
+                        <ol className="mt-4 list-decimal list-inside space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                          <li>Enter the URL of the e-commerce website you want to scrape in the input field above.</li>
+                          <li>Click the &quot;Create Scrape&quot; button to initiate the scraping process.</li>
+                          <li>Wait for the scraping to complete. This may take a few seconds.</li>
+                          <li>Once completed, you can view the results in the &quot;Recent Scrapes&quot; tab.</li>
+                          <li>For more detailed information, click on &quot;View Details&quot; for any specific scrape.</li>
+                        </ol>
+                      </div>
+                    </div>
               </TabsContent>
               <TabsContent value="recent" className="space-y-4">
                 <RecentScrapesContent />
