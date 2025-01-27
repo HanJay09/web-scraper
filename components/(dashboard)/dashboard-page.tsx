@@ -43,11 +43,46 @@ export default function Dashboard() {
   const [isResetEmailSent, setIsResetEmailSent] = useState(false)
   const [updateMessage, setUpdateMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
+  // Fetch user data once on mount
   useEffect(() => {
-    if (user?.user_metadata?.full_name) {
-      setDisplayName(user.user_metadata.full_name)
-    }
-  }, [user])
+    const fetchUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        setUser(data.user);
+        if (data.user.user_metadata?.full_name) {
+          setDisplayName(data.user.user_metadata.full_name);
+        }
+      }
+    };
+    fetchUser();
+  }, []);
+
+  // Separate effect for fetching scrapes, only runs when user ID changes
+  useEffect(() => {
+    const fetchScrapes = async () => {
+      if (!user?.id) return;
+      
+      const { data, error } = await supabase
+        .from('scrapes')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching scrapes:', error);
+        return;
+      }
+
+      setScrapeResults(data.map(scrape => ({
+        id: scrape.id,
+        url: scrape.url,
+        timestamp: new Date(scrape.created_at),
+        result: scrape.scrape_data.data,
+        type: 'scrape'
+      })));
+    };
+
+    fetchScrapes();
+  }, [user?.id]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,42 +133,6 @@ export default function Dashboard() {
     }
   };
 
-  useEffect(() => {
-    const fetchScrapes = async () => {
-      if (!user) return;
-      
-      const { data, error } = await supabase
-        .from('scrapes')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching scrapes:', error);
-        return;
-      }
-
-      setScrapeResults(data.map(scrape => ({
-        id: scrape.id,
-        url: scrape.url,
-        timestamp: new Date(scrape.created_at),
-        result: scrape.scrape_data.data,
-        type: 'scrape'
-      })));
-    };
-
-    fetchScrapes();
-  }, [user]);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data?.user) {
-        setUser(data.user);
-      }
-    };
-    fetchUser();
-  }, []);
-
   const handleViewDetails = (scrape: unknown) => {
     setSelectedScrape(scrape)
     setActiveTab("details")
@@ -156,77 +155,119 @@ export default function Dashboard() {
 
   const handleCreateScrape = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     setIsLoading(true);
     setError(null);
-
+  
     try {
       if (!url) {
         throw new Error('Please enter a URL to scrape');
       }
-
+  
       let normalizedUrl = url;
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
         normalizedUrl = `https://${url}`;
       }
-
+  
+      // First check if this URL already exists in the database
+      const { data: existingData, error: searchError } = await supabase
+        .from('scrapes')
+        .select('*')
+        .eq('url', normalizedUrl)
+        .eq('user_id', user?.id)
+        .single();
+  
+      if (searchError && searchError.code !== 'PGRST116') { // PGRST116 means no rows returned
+        throw new Error('Error checking for existing scrape');
+      }
+  
+      // Get new scrape data regardless of whether it's an update or new entry
       const result = await createScrape(normalizedUrl, {
         useChrome: false,
         premiumProxy: false,
       });
-
-      // Then try to insert into Supabase with retry logic
+  
       let retryCount = 0;
       const maxRetries = 3;
-
-      while (retryCount < maxRetries) {
-        const { data: insertedData, error: insertError } = await supabase
-          .from('scrapes')
-          .insert({
-            url: normalizedUrl,
-            scrape_data: { data: result.data },
-            user_id: user?.id,
-            
-          })
-          .select()
-          .single();
+      let savedData;
   
-        if (!insertError) {
-          // Success! Add to UI
-          if (insertedData) {
-            const scrapeResult: ScrapeResult = {
-              id: insertedData.id,
-              url: insertedData.url,
-              timestamp: new Date(insertedData.created_at),
-              type: 'product',
-              user_id: insertedData.user_id,
-              result: {
-                title: result.data.title,
-                description: result.data.description,
-                price: result.data.price,
-                currency: result.data.currency,
-                isInStock: result.data.isInStock,
-                image: result.data.image
-              }
-            };
-            
-            setScrapeResults(prev => [scrapeResult, ...prev]);
+      while (retryCount < maxRetries) {
+        if (existingData) {
+          // Update existing record
+          const { data: updatedData, error: updateError } = await supabase
+            .from('scrapes')
+            .update({
+              scrape_data: { data: result.data },
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingData.id)
+            .select()
+            .single();
+  
+          if (!updateError) {
+            savedData = updatedData;
+            toast.success('Product information updated successfully!');
+            break;
           }
-          
-          setUrl("");
-          toast.success('Scraping completed successfully!');
-          break;
+        } else {
+          // Insert new record
+          const { data: insertedData, error: insertError } = await supabase
+            .from('scrapes')
+            .insert({
+              url: normalizedUrl,
+              scrape_data: { data: result.data },
+              user_id: user?.id,
+            })
+            .select()
+            .single();
+  
+          if (!insertError) {
+            savedData = insertedData;
+            toast.success('New product scraped successfully!');
+            break;
+          }
         }
   
-        // If there's an error, wait a bit and retry
+        // If there's an error, wait and retry
         await new Promise(resolve => setTimeout(resolve, 1000));
         retryCount++;
         
-        // Only show error on final retry
         if (retryCount === maxRetries) {
-          console.error('Supabase insert error:', insertError);
           throw new Error('Failed to save scrape data after multiple attempts');
         }
       }
+  
+      // Update UI with saved data
+      if (savedData) {
+        const scrapeResult: ScrapeResult = {
+          id: savedData.id,
+          url: savedData.url,
+          timestamp: new Date(savedData.created_at),
+          type: 'product',
+          user_id: savedData.user_id,
+          result: {
+            title: result.data.title,
+            description: result.data.description,
+            price: result.data.price,
+            currency: result.data.currency,
+            isInStock: result.data.isInStock,
+            image: result.data.image
+          }
+        };
+        
+        // Update scrapeResults state - replace if exists, add if new
+        setScrapeResults(prev => {
+          const existingIndex = prev.findIndex(item => item.url === normalizedUrl);
+          if (existingIndex !== -1) {
+            const newResults = [...prev];
+            newResults[existingIndex] = scrapeResult;
+            return newResults;
+          }
+          return [scrapeResult, ...prev];
+        });
+      }
+      
+      setUrl("");
   
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred while scraping');
@@ -234,7 +275,6 @@ export default function Dashboard() {
     } finally {
       setIsLoading(false);
     }
-  
   };
 
   // Component for displaying scrape details
@@ -303,67 +343,109 @@ export default function Dashboard() {
     )
   }
 
-  const RecentScrapesContent = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>Recent Scrapes</CardTitle>
-        <CardDescription>Your most recent web scraping activities</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {scrapeResults.length > 0 ? (
-            scrapeResults.slice(0, 5).map((scrape) => (
-              <div key={scrape.id} className="flex items-center justify-between border-b pb-4">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium leading-none">
-                    {scrape.result.title}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {toRelativeString(new Date(scrape.timestamp))}
-                  </p>
-                  {scrape.result.price && (
-                    <p className="text-sm font-medium">
-                      Price: {scrape.result.currency}{scrape.result.price}
-                    </p>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => window.open(scrape.url, '_blank')}
-                  >
-                    Visit Site
-                  </Button>
-                  <Button variant="outline" onClick={() => handleViewDetails(scrape)}>View Details</Button>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              No scrapes yet. Create your first scrape to see results here.
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  )
+  const RecentScrapesContent = () => {
+    // Filter out duplicates by keeping only the most recent scrape for each URL
+    const uniqueScrapes = scrapeResults.reduce((acc, current) => {
+      const existingIndex = acc.findIndex(item => item.url === current.url);
+      if (existingIndex === -1) {
+        // URL not found, add the scrape
+        acc.push(current);
+      } else {
+        // URL exists, replace if current is newer
+        const existing = acc[existingIndex];
+        if (new Date(current.timestamp) > new Date(existing.timestamp)) {
+          acc[existingIndex] = current;
+        }
+      }
+      return acc;
+    }, [] as ScrapeResult[]);
   
-  const RecentActivity = () => (
-    <div className="space-y-8">
-      {scrapeResults.slice(0, 3).map((scrape, index) => (
-        <div key={index} className="flex items-center">
-          <div className="space-y-1">
-            <p className="text-sm font-medium leading-none">
-              {scrape.result.title || 'Web Scrape'}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Completed {toRelativeString(new Date(scrape.timestamp))}
-            </p>
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Scrapes</CardTitle>
+          <CardDescription>Your most recent web scraping activities</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {uniqueScrapes.length > 0 ? (
+              uniqueScrapes
+                .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                .slice(0, 5)
+                .map((scrape) => (
+                  <div key={scrape.id} className="flex items-center justify-between border-b pb-4">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium leading-none">
+                        {scrape.result.title}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Last updated {toRelativeString(new Date(scrape.timestamp))}
+                      </p>
+                      {scrape.result.price && (
+                        <p className="text-sm font-medium">
+                          Price: {scrape.result.currency}{scrape.result.price}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => window.open(scrape.url, '_blank')}
+                      >
+                        Visit Site
+                      </Button>
+                      <Button variant="outline" onClick={() => handleViewDetails(scrape)}>
+                        View Details
+                      </Button>
+                    </div>
+                  </div>
+                ))
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No scrapes yet. Create your first scrape to see results here.
+              </div>
+            )}
           </div>
-        </div>
-      ))}
-    </div>
-  );
+        </CardContent>
+      </Card>
+    );
+  };
+  
+  const RecentActivity = () => {
+    // Filter out duplicates by keeping only the most recent scrape for each URL
+    const uniqueScrapes = scrapeResults.reduce((acc, current) => {
+      const existingIndex = acc.findIndex(item => item.url === current.url);
+      if (existingIndex === -1) {
+        acc.push(current);
+      } else {
+        const existing = acc[existingIndex];
+        if (new Date(current.timestamp) > new Date(existing.timestamp)) {
+          acc[existingIndex] = current;
+        }
+      }
+      return acc;
+    }, [] as ScrapeResult[]);
+  
+    return (
+      <div className="space-y-8">
+        {uniqueScrapes
+          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+          .slice(0, 3)
+          .map((scrape, index) => (
+            <div key={index} className="flex items-center">
+              <div className="space-y-1">
+                <p className="text-sm font-medium leading-none">
+                  {scrape.result.title || 'Web Scrape'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Last updated {toRelativeString(new Date(scrape.timestamp))}
+                </p>
+              </div>
+            </div>
+          ))}
+      </div>
+    );
+  };
 
   return (
     <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-900">
