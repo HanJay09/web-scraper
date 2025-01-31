@@ -16,7 +16,9 @@ import { toRelativeString } from "@/utils/date"
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Footer } from '@/components/Footer';
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const downloadJSON = (data: unknown, filename: string) => {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -42,6 +44,8 @@ export default function Dashboard() {
   const [displayName, setDisplayName] = useState('')
   const [isResetEmailSent, setIsResetEmailSent] = useState(false)
   const [updateMessage, setUpdateMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [isAutomated, setIsAutomated] = useState(false)
+  // const [automationInterval, setAutomationInterval] = useState(24)
 
   // Fetch user data once on mount
   useEffect(() => {
@@ -567,6 +571,41 @@ export default function Dashboard() {
                           disabled={isLoading}
                         />
                       </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="automated-scraping"
+                          checked={isAutomated}
+                          onCheckedChange={setIsAutomated}
+                        />
+                        <Label htmlFor="automated-scraping">Enable Automated Scraping</Label>
+                      </div>
+                      {isAutomated && (
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="automation-interval">Automation Interval</Label>
+                            <Select defaultValue="24">
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select interval" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1">Every hour</SelectItem>
+                                <SelectItem value="6">Every 6 hours</SelectItem>
+                                <SelectItem value="12">Every 12 hours</SelectItem>
+                                <SelectItem value="24">Every 24 hours</SelectItem>
+                                <SelectItem value="168">Every week</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="start-time">Start Time</Label>
+                            <Input
+                              id="start-time"
+                              type="time"
+                              defaultValue="09:00"
+                            />
+                          </div>
+                        </div>
+                      )}
                       {error && (
                         <div className="text-red-500 text-sm mt-2">
                           {error}
@@ -584,6 +623,7 @@ export default function Dashboard() {
                         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">How to use the scraping feature:</p>
                         <ol className="mt-4 list-decimal list-inside space-y-2 text-sm text-gray-600 dark:text-gray-400">
                           <li>Enter the URL of the e-commerce website you want to scrape in the input field above.</li>
+                          <li>Enable automated scraping if you want to schedule regular scrapes.</li>
                           <li>Click the &quot;Create Scrape&quot; button to initiate the scraping process.</li>
                           <li>Wait for the scraping to complete. This may take a few seconds.</li>
                           <li>Once completed, you can view the results in the &quot;Recent Scrapes&quot; tab.</li>
