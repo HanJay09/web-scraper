@@ -157,6 +157,90 @@ export default function Dashboard() {
     })
   }
 
+  const ECOMMERCE_DOMAINS = [
+    'amazon',
+    'ebay',
+    'walmart',
+    'etsy',
+    'shopify',
+    'bestbuy',
+    'target',
+    'newegg',
+    'wayfair',
+    'homedepot',
+    'aliexpress',
+    // Add more as needed
+  ];
+  
+  // Common e-commerce URL patterns
+  const ECOMMERCE_PATTERNS = [
+    '/product/',
+    '/item/',
+    '/dp/',
+    '/shop/',
+    '/store/',
+    // Add more as needed
+  ];
+  
+  const isValidUrl = (url: string): boolean => {
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const isEcommerceSite = async (url: string): Promise<boolean> => {
+    try {
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname.toLowerCase();
+      const pathname = urlObj.pathname.toLowerCase();
+  
+      // Check if it's a known e-commerce domain
+      if (ECOMMERCE_DOMAINS.some(domain => hostname.includes(domain))) {
+        return true;
+      }
+  
+      // Check if URL contains common e-commerce patterns
+      if (ECOMMERCE_PATTERNS.some(pattern => pathname.includes(pattern))) {
+        return true;
+      }
+  
+      // Try to fetch the page and look for e-commerce indicators
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error('Failed to fetch URL');
+        }
+        const text = await response.text();
+        
+        // Check for common e-commerce indicators in the page content
+        const ecommerceIndicators = [
+          'add to cart',
+          'add to basket',
+          'buy now',
+          'shopping cart',
+          'checkout',
+          'price',
+          'product description',
+          'shipping',
+          'stock',
+          'inventory'
+        ];
+  
+        return ecommerceIndicators.some(indicator => 
+          text.toLowerCase().includes(indicator)
+        );
+      } catch {
+        // If we can't fetch the page, rely only on URL-based checks
+        return false;
+      }
+    } catch {
+      return false;
+    }
+  };
+
   const handleCreateScrape = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
@@ -173,6 +257,32 @@ export default function Dashboard() {
         normalizedUrl = `https://${url}`;
       }
   
+      // Validate the normalized URL
+      if (!isValidUrl(normalizedUrl)) {
+        throw new Error('Please enter a valid URL');
+      }
+
+      // Check if it's an e-commerce site
+      const isEcommerce = await isEcommerceSite(normalizedUrl);
+      if (!isEcommerce) {
+        throw new Error('This URL does not appear to be an e-commerce product page. Please enter a valid product URL.');
+      }
+
+      // Additional validation for specific requirements if needed
+      const urlObj = new URL(normalizedUrl);
+      
+      // Example: Check if URL is not just an IP address
+      const domainParts = urlObj.hostname.split('.');
+      if (domainParts.every(part => !isNaN(Number(part)))) {
+        throw new Error('IP addresses are not allowed');
+      }
+
+      // Example: Check for allowed domains/TLDs
+      const allowedTLDs = ['.com', '.org', '.net', '.edu', '.gov'];
+      if (!allowedTLDs.some(tld => urlObj.hostname.endsWith(tld))) {
+        throw new Error('URL must end with .com, .org, .net, .edu, or .gov');
+      }      
+
       // First check if this URL already exists in the database
       const { data: existingData, error: searchError } = await supabase
         .from('scrapes')
